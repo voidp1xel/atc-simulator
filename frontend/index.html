@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Real-Time Air Traffic Control Sector Simulator with radar display and controller commands.">
+    <title>ATC Sector Simulator — Radar Display</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- ═══════ Welcome / Help Overlay ═══════ -->
+    <div id="helpOverlay" class="overlay">
+        <div class="overlay-card">
+            <div class="overlay-header">
+                <span class="overlay-icon">◈</span>
+                <h1>ATC Sector Simulator</h1>
+                <p class="overlay-subtitle">Real-Time Air Traffic Control Radar</p>
+            </div>
+            <div class="overlay-body">
+                <div class="help-section">
+                    <h3>🖱️ Controls</h3>
+                    <ul>
+                        <li><kbd>Click</kbd> an aircraft blip to select it</li>
+                        <li><kbd>Scroll</kbd> to zoom in/out on the radar</li>
+                        <li><kbd>Esc</kbd> to deselect aircraft</li>
+                        <li><kbd>?</kbd> to toggle this help screen</li>
+                    </ul>
+                </div>
+                <div class="help-section">
+                    <h3>📡 Commands</h3>
+                    <p>Select an aircraft, then type a command and press <kbd>Enter</kbd>:</p>
+                    <div class="help-commands">
+                        <code>heading 270</code> <span>— Turn to heading 270°</span>
+                        <code>altitude 350</code> <span>— Climb/descend to FL350</span>
+                        <code>speed 250</code> <span>— Set speed to 250 knots</span>
+                    </div>
+                </div>
+                <div class="help-section">
+                    <h3>📖 Reading the Radar</h3>
+                    <div class="help-legend">
+                        <div class="legend-item"><span class="legend-dot green"></span> Aircraft blip</div>
+                        <div class="legend-item"><span class="legend-dot cyan"></span> Selected aircraft</div>
+                        <div class="legend-item"><span class="legend-dot red"></span> Conflict (loss of separation)</div>
+                        <div class="legend-item"><span class="legend-tri"></span> Waypoint / Fix</div>
+                    </div>
+                    <p class="help-datablock">Data block: <code>AAL123</code> = callsign, <code>350</code> = FL350 (35,000 ft), <code>450</code> = 450 kts</p>
+                </div>
+            </div>
+            <button id="helpCloseBtn" class="overlay-btn">Begin Controlling ▸</button>
+            <p class="overlay-hint">Press <kbd>?</kbd> anytime to see this again</p>
+        </div>
+    </div>
+
+    <!-- ═══════ Top status bar ═══════ -->
+    <header id="statusBar">
+        <div class="status-left">
+            <span class="logo">◈ ATC SECTOR SIM</span>
+            <span class="separator">│</span>
+            <span id="connectionStatus" class="status-disconnected">DISCONNECTED</span>
+        </div>
+        <div class="status-center">
+            <span id="simTime">T+ 00:00:00</span>
+            <span class="separator">│</span>
+            <span id="zoomLevel">ZOOM: 1.0×</span>
+        </div>
+        <div class="status-right">
+            <span id="acCount">AC: 0</span>
+            <span class="separator">│</span>
+            <span id="conflictCount" class="no-conflict">CONFLICTS: 0</span>
+            <span class="separator">│</span>
+            <button id="helpBtn" class="header-btn" title="Help (?)">?</button>
+        </div>
+    </header>
+
+    <!-- ═══════ Main content area ═══════ -->
+    <main id="mainContainer">
+        <!-- Radar canvas -->
+        <div id="radarContainer">
+            <canvas id="radarCanvas"></canvas>
+            <!-- Hover tooltip (positioned dynamically) -->
+            <div id="hoverTooltip" class="tooltip hidden"></div>
+        </div>
+
+        <!-- Right sidebar -->
+        <aside id="sidebar">
+            <!-- Aircraft Info -->
+            <div id="infoPanel">
+                <h2>AIRCRAFT INFO</h2>
+                <div id="noSelection" class="info-message">
+                    <div class="empty-icon">✈</div>
+                    Click an aircraft blip<br>on the radar to select
+                    <div class="hint-text">or press <kbd>?</kbd> for help</div>
+                </div>
+                <div id="selectionInfo" class="hidden">
+                    <div class="info-row">
+                        <span class="info-label">CALLSIGN</span>
+                        <span id="infoCallsign" class="info-value accent">---</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">ALTITUDE</span>
+                        <span id="infoAltitude" class="info-value">---</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">SPEED</span>
+                        <span id="infoSpeed" class="info-value">---</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">HEADING</span>
+                        <span id="infoHeading" class="info-value">---</span>
+                    </div>
+                    <hr class="divider">
+                    <h3 class="sub-header">ASSIGNED VALUES</h3>
+                    <div class="info-row">
+                        <span class="info-label">TGT HDG</span>
+                        <span id="infoTgtHdg" class="info-value dim">---</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">TGT ALT</span>
+                        <span id="infoTgtAlt" class="info-value dim">---</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">TGT SPD</span>
+                        <span id="infoTgtSpd" class="info-value dim">---</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div id="quickActions" class="hidden">
+                <h2>QUICK ACTIONS</h2>
+                <div class="quick-grid">
+                    <button class="quick-btn" data-action="heading" data-value="360" title="Turn North">N<br><small>360°</small></button>
+                    <button class="quick-btn" data-action="heading" data-value="90" title="Turn East">E<br><small>090°</small></button>
+                    <button class="quick-btn" data-action="heading" data-value="180" title="Turn South">S<br><small>180°</small></button>
+                    <button class="quick-btn" data-action="heading" data-value="270" title="Turn West">W<br><small>270°</small></button>
+                </div>
+                <div class="quick-row">
+                    <button class="quick-btn wide" data-action="altitude" data-delta="+5000" title="Climb 5,000 ft">▲ CLIMB 50</button>
+                    <button class="quick-btn wide" data-action="altitude" data-delta="-5000" title="Descend 5,000 ft">▼ DESCEND 50</button>
+                </div>
+                <div class="quick-row">
+                    <button class="quick-btn wide" data-action="speed" data-delta="+50" title="Speed up 50 kts">▸▸ +50 KTS</button>
+                    <button class="quick-btn wide" data-action="speed" data-delta="-50" title="Slow down 50 kts">◂◂ −50 KTS</button>
+                </div>
+            </div>
+
+            <!-- Command Input -->
+            <div id="commandPanel">
+                <h2>CONTROLLER COMMANDS</h2>
+                <div class="command-examples">
+                    <code>heading 270</code>
+                    <code>altitude 350</code>
+                    <code>speed 250</code>
+                </div>
+                <div class="command-input-wrap">
+                    <label for="commandInput" id="commandLabel">CMD ▸</label>
+                    <input type="text" id="commandInput" placeholder="Select an aircraft first..."
+                           autocomplete="off" spellcheck="false" disabled>
+                </div>
+                <div id="commandFeedback"></div>
+            </div>
+
+            <!-- Conflict list -->
+            <div id="conflictPanel">
+                <h2>⚠ SEPARATION ALERTS</h2>
+                <ul id="conflictList"></ul>
+            </div>
+
+            <!-- Footer -->
+            <div class="sidebar-footer">
+                <span>Separation: 3nm / 1000ft</span>
+                <span>Tick: 20Hz • Net: 10Hz</span>
+            </div>
+        </aside>
+    </main>
+
+    <script src="network.js"></script>
+    <script src="radar.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
